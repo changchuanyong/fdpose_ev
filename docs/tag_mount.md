@@ -10,10 +10,10 @@
 
 ## 完整板和码面
 
-- `socket_tag_m6_v2.3mf` 含白板和黑色码块两个部件。导入 Bambu Studio 后，确认白板和黑码分别使用白、黑耗材。码面与白板正面齐平。
+- `socket_tag_m6_v2.3mf` 含白板和黑色码块两个部件。导入 Bambu Studio 后，确认白板和黑码分别使用白、黑耗材。码面与白板正面齐平。仓库里另存了一份切片后的工程文件 `socket_tag_m6_v2_sliced.3mf`（15 个条目，含切片与耗材设置），实际打印用这份。
 - `socket_tag_m6_v2.stl` 是单色平面板。单色打印时可另打一张 ArUco `DICT_6X6_250`、ID 0 的图案（黑色外框边长 46 mm）贴在主板矩形区中心，外围留白，图案上沿朝插座上方。定位以图纸为准，贴好后实测边长和码面位置。
 - `socket_tag_m6_assembly.svg` 是装配尺寸图。`socket_tag_m6_spec.json` 的变换是双色板的 CAD 名义值。插座最前端是 `target z=0`，安装面是 `z=-12.5 mm`，双色码面中心名义坐标为 `(80, 0, -7.5) mm`。码坐标原点取黑框中心，+X 朝右、+Y 朝上、+Z 朝相机侧。标定记录应使用实测变换。
 
 再生成模型可在工程根目录运行 `python -B scripts/pipeline/create_tag_mount_v2.py`。
 
-注意：该命令会覆盖 `assets/print/` 下的同名文件。仓库里的 `socket_tag_m6_v2.3mf` 是在 Bambu Studio 里切片后另存的工程文件（含 15 个条目），重跑会被替换成只含网格的裸 3MF；需要保留切片结果请先备份。
+注意：该命令会覆盖 `assets/print/socket_tag_m6_v2.3mf`，把它换成只含网格的裸 3MF。切片工程另存为 `socket_tag_m6_v2_sliced.3mf`，不受该命令影响；如果在工作区里重新切片，记得同步更新这份副本。

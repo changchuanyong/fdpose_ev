@@ -25,6 +25,7 @@ REQUIRED = (
     "config/upstream.json",
     "config/geometry/socket_openings_ply.json",
     "assets/mesh/socket_mod.STL",
+    "assets/print/socket_tag_m6_v2_sliced.3mf",
     "patches/README.md",
     "patches/foundationpose-windows.patch",
     "apps/jetson_foundationpose_d415.py",
