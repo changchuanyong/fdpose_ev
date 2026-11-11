@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="590" viewBox="0 0 980 590">
+  <defs>
+    <marker id="start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M10 0 L0 5 L10 10 Z" fill="#1e4a7b"/></marker>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#1e4a7b"/></marker>
+  </defs>
+  <style>
+    text { font-family: Microsoft YaHei; fill: #162539; font-size: 16px; }
+    .title { font-weight: bold; font-size: 26px; }
+    .dim { fill: none; stroke: #1e4a7b; stroke-width: 1.3; }
+    .outline { stroke: #22354d; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  </style>
+  <rect width="980" height="590" fill="#fff"/>
+  <text x="32" y="42" class="title">插座标定板 V2 · 双 M6 螺栓安装</text>
+  <text x="32" y="72">正视图 · 尺寸单位 mm</text>
+  <g transform="translate(205 314) scale(3.5)">
+    <rect class="outline" x="-45" y="-45" width="90" height="90" fill="#e5e9ee"/>
+    <circle class="outline" r="35.75" fill="#d3dce7"/>
+    <circle class="outline" cx="-36" cy="-36" r="3.5" fill="white"/>
+    <circle class="outline" cx="-36" cy="36" r="3.5" fill="white"/>
+    <path class="outline" fill="#fff" d="M27 -45 H115 V45 H27 V27 H45 V-27 H27 Z"/>
+    <path class="outline" fill="none" stroke-dasharray="2 1" d="M52 -45 V45"/>
+    <g fill="#101010"><rect x="57.0" y="-23.0" width="5.75" height="5.75"/><rect x="62.75" y="-23.0" width="5.75" height="5.75"/><rect x="68.5" y="-23.0" width="5.75" height="5.75"/><rect x="74.25" y="-23.0" width="5.75" height="5.75"/><rect x="80.0" y="-23.0" width="5.75" height="5.75"/><rect x="85.75" y="-23.0" width="5.75" height="5.75"/><rect x="91.5" y="-23.0" width="5.75" height="5.75"/><rect x="97.25" y="-23.0" width="5.75" height="5.75"/><rect x="57.0" y="-17.25" width="5.75" height="5.75"/><rect x="62.75" y="-17.25" width="5.75" height="5.75"/><rect x="68.5" y="-17.25" width="5.75" height="5.75"/><rect x="74.25" y="-17.25" width="5.75" height="5.75"/><rect x="97.25" y="-17.25" width="5.75" height="5.75"/><rect x="57.0" y="-11.5" width="5.75" height="5.75"/><rect x="68.5" y="-11.5" width="5.75" height="5.75"/><rect x="74.25" y="-11.5" width="5.75" height="5.75"/><rect x="80.0" y="-11.5" width="5.75" height="5.75"/><rect x="97.25" y="-11.5" width="5.75" height="5.75"/><rect x="57.0" y="-5.75" width="5.75" height="5.75"/><rect x="74.25" y="-5.75" width="5.75" height="5.75"/><rect x="97.25" y="-5.75" width="5.75" height="5.75"/><rect x="57.0" y="0.0" width="5.75" height="5.75"/><rect x="62.75" y="0.0" width="5.75" height="5.75"/><rect x="80.0" y="0.0" width="5.75" height="5.75"/><rect x="85.75" y="0.0" width="5.75" height="5.75"/><rect x="91.5" y="0.0" width="5.75" height="5.75"/><rect x="97.25" y="0.0" width="5.75" height="5.75"/><rect x="57.0" y="5.75" width="5.75" height="5.75"/><rect x="62.75" y="5.75" width="5.75" height="5.75"/><rect x="68.5" y="5.75" width="5.75" height="5.75"/><rect x="80.0" y="5.75" width="5.75" height="5.75"/><rect x="91.5" y="5.75" width="5.75" height="5.75"/><rect x="97.25" y="5.75" width="5.75" height="5.75"/><rect x="57.0" y="11.5" width="5.75" height="5.75"/><rect x="68.5" y="11.5" width="5.75" height="5.75"/><rect x="74.25" y="11.5" width="5.75" height="5.75"/><rect x="91.5" y="11.5" width="5.75" height="5.75"/><rect x="97.25" y="11.5" width="5.75" height="5.75"/><rect x="57.0" y="17.25" width="5.75" height="5.75"/><rect x="62.75" y="17.25" width="5.75" height="5.75"/><rect x="68.5" y="17.25" width="5.75" height="5.75"/><rect x="74.25" y="17.25" width="5.75" height="5.75"/><rect x="80.0" y="17.25" width="5.75" height="5.75"/><rect x="85.75" y="17.25" width="5.75" height="5.75"/><rect x="91.5" y="17.25" width="5.75" height="5.75"/><rect x="97.25" y="17.25" width="5.75" height="5.75"/></g>
+    <g stroke="#294f78" stroke-width=".42" fill="white">
+      <circle cx="36" cy="-36" r="3.5"/><circle cx="36" cy="36" r="3.5"/>
+    </g>
+  </g>
+  <g class="dim">
+    <path d="M331 188 H410 M331 440 H410 M300 153 V117 M607 153 V117 M48 472 V516 M363 472 V516"/>
+    <path d="M300 122 H607" marker-start="url(#start)" marker-end="url(#arrow)"/>
+    <path d="M400 188 V440" marker-start="url(#start)" marker-end="url(#arrow)"/>
+    <path d="M48 505 H363" marker-start="url(#start)" marker-end="url(#arrow)"/>
+    <path d="M615 174 H577 L343 188" marker-end="url(#arrow)"/>
+  </g>
+  <text x="454" y="112" text-anchor="middle">88 · 新板总宽</text>
+  <text x="411" y="230">72</text>
+  <text x="205" y="532" text-anchor="middle">90 · 插座法兰宽</text>
+  <text x="627" y="178">2 × Ø7 通孔</text>
+  <text x="80" y="310">插座前端</text>
+  <text x="485" y="499" text-anchor="middle">ArUco 46 × 46</text>
+  <text x="32" y="565">虚线是试装件外缘。整板和试装件共用两个安装孔及安装耳。</text>
+  <text x="645" y="238" class="title">紧固剖面</text>
+  <text x="645" y="265">前方 / 相机侧 ←</text>
+  <g class="outline">
+    <rect x="747" y="304" width="28" height="88" fill="#f3f7fb"/>
+    <rect x="775" y="304" width="28" height="88" fill="#d3dce7"/>
+    <rect x="728" y="334" width="14" height="28" fill="#a9b8c9"/>
+    <rect x="742" y="330" width="5" height="36" fill="#c0cad5"/>
+    <rect x="803" y="330" width="5" height="36" fill="#c0cad5"/>
+    <rect x="808" y="334" width="18" height="28" fill="#a9b8c9"/>
+    <rect x="742" y="343" width="93" height="10" fill="#9baec3"/>
+  </g>
+  <text x="649" y="418">板厚 5</text>
+  <text x="774" y="418">法兰厚 5</text>
+  <text x="649" y="447">M6×20 螺栓 + 两面垫片 + 螺母</text>
+  <text x="649" y="476">螺母侧留出工具空间</text>
+</svg>

@@ -1,0 +1,43 @@
+# Jetson AGX Orin 候选版本约束（JetPack 6.2 / L4T R36.5.2 / CUDA 12.6 / Ubuntu 22.04 / aarch64）
+#
+# 先按下面的命令安装 PyTorch（NVIDIA Jetson 轮子源，PyPI 的 cu126 轮子不适用于 aarch64）：
+#   pip install torch==2.9.1 torchvision==0.24.1 --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+#
+# 其余依赖与上游 requirements.txt 语义一致，只做两处平台适配：
+#   1. opencv-python-headless 取代 opencv-python：服务器无 GUI 依赖。
+#      必须用 5.x：FoundationPose 的 draw_xyz_axis 传 tipLength=0，OpenCV 4.14 会断言失败
+#      （tipLength > 0.0），5.0.0.93 与 Windows 侧一致。
+#   2. 去掉 PyOpenGL-accelerate：PyPI 无 aarch64 轮子，且 demo 与库调用路径不使用。
+#   3. 固定 torch 2.9.1 / torchvision 0.24.1（见文件头，来自 NVIDIA Jetson 轮子源）。
+#   4. 追加 nvidia-cudss-cu12==0.8.0.10：torch 2.9.1 的 libtorch_cuda.so 依赖 libcudss.so.0，
+#      JetPack 6.2 不自带 cuDSS；安装后把库软链到 torch/lib 由 RUNPATH=$ORIGIN 解析。
+#      另外用 JetPack cuSolver 兼容垫片补上 cusolverDnXsyevBatched*（见 scripts/jetson_setup.sh）。
+#   5. warp-lang 固定 1.9.1：1.19.0 自带 CUDA 13.4 工具链，JetPack 6.2 的 12.6 驱动被判为
+#      "insufficient CUDA driver version" 而只用 CPU；1.9.1 带 CUDA 12.8 工具链可正常识别 Orin。
+# 版本由 docs/jetson_setup.md 记录的安装结果与 artifacts/jetson/pip-freeze.txt 冻结。
+opencv-python-headless==5.0.0.93
+nvidia-cudss-cu12==0.8.0.10
+warp-lang==1.9.1
+numpy>=2,<3
+scipy
+scikit-learn
+h5py
+joblib
+PyYAML>=6
+ruamel.yaml>=0.18
+opencv-python-headless<5
+imageio
+open3d
+trimesh
+transformations
+matplotlib
+pandas
+Pillow
+pyrender
+PyOpenGL>=3.1
+kornia>=0.7
+omegaconf>=2.3
+psutil
+tqdm
+warp-lang
+scikit-image

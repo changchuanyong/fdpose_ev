@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "foundationpose": {
+    "url": "https://github.com/NVlabs/FoundationPose.git",
+    "commit": "a1b694b83e633c2cb6115b9063d940a687759392",
+    "path": "third_party/FoundationPose",
+    "local_modifications": true,
+    "patch": "patches/foundationpose-windows.patch"
+  },
+  "pytorch3d": {
+    "url": "https://github.com/facebookresearch/pytorch3d.git",
+    "commit": "e4ad6e5687a360ccdc6ebd91348e8dbbac97bf31",
+    "path": "third_party/pytorch3d"
+  },
+  "nvdiffrast": {
+    "url": "https://github.com/NVlabs/nvdiffrast.git",
+    "commit": "253ac4fcea7de5f396371124af597e6cc957bfae",
+    "path": "third_party/nvdiffrast"
+  },
+  "candidate_runtime": {
+    "python": "3.11",
+    "torch": "2.7.1",
+    "torchvision": "0.22.1",
+    "torch_index": "https://download.pytorch.org/whl/cu128",
+    "cuda_toolkit": "12.8",
+    "msvc_toolset": "14.38",
+    "windows_sdk": "10.0.22621.0",
+    "validated": false
+  },
+  "runtime_lock_status": "not_created_before_gpu_validation"
+}

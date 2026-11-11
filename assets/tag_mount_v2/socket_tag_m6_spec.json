@@ -1,0 +1,58 @@
+{
+  "units": "mm",
+  "validated_on_hardware": false,
+  "mesh_frame": "x and y follow target; z=0 is the plate rear mounting face",
+  "target_origin_cad_y_mm": 52.5,
+  "flange_front_cad_y_mm": 40.0,
+  "flange_front_target_z_mm": -12.5,
+  "mount_hole_centers_xy_mm": [
+    [
+      36.0,
+      -36.0
+    ],
+    [
+      36.0,
+      36.0
+    ]
+  ],
+  "mount_hole_diameter_mm": 7.0,
+  "plate_thickness_mm": 5.0,
+  "fit_coupon_thickness_mm": 3.0,
+  "marker": {
+    "dictionary": "DICT_6X6_250",
+    "id": 0,
+    "side_mm": 46.0,
+    "top_edge_direction": "+target_y",
+    "center_target_mm": [
+      80.0,
+      0.0,
+      -7.5
+    ],
+    "T_target_tag_nominal_m": [
+      [
+        1,
+        0,
+        0,
+        0.08
+      ],
+      [
+        0,
+        1,
+        0,
+        0.0
+      ],
+      [
+        0,
+        0,
+        1,
+        -0.0075
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ]
+  }
+}

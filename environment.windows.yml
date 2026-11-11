@@ -1,0 +1,21 @@
+# Candidate only: not an installed or validated environment lock.
+# Use a project-local prefix: .runtime/foundationpose
+name: fdonpose
+channels:
+  - nvidia/label/cuda-12.8.1
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy=2
+  - eigen
+  - boost-cpp
+  - pybind11
+  - cuda-toolkit=12.8.1
+# Run Conda with process-local PYTHONUTF8=1 and PYTHONIOENCODING=utf-8.
+# Install cmake==3.31.6 and ninja==1.11.1.4 using pip; invoke through
+# scripts/with_build_env.cmd so the pinned pip tools take precedence.
+# After the native toolchain gate, install torch==2.7.1 and
+# torchvision==0.22.1 from https://download.pytorch.org/whl/cu128.
+# Do not install this file into the existing ev-charging environment.

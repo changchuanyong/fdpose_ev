@@ -1,0 +1,181 @@
+diff --git a/Utils.py b/Utils.py
+index 283028f..a290fa3 100644
+--- a/Utils.py
++++ b/Utils.py
+@@ -54,6 +54,15 @@ except:
+   common = None
+ try:
+   import warp as wp
++  wp.config.kernel_cache_dir = os.environ.get('WARP_CACHE_DIR', os.path.join(os.getcwd(), '.cache', 'warp'))
++  try:
++    _cuda_target_include = os.path.join(os.environ.get('CUDA_HOME', ''), 'include', 'targets', 'x64')
++    _warp_native_include = os.path.join(os.path.dirname(wp.__file__), 'native')
++    _warp_cuda_includes = [p for p in (_warp_native_include, _cuda_target_include) if os.path.isdir(p)]
++    if _warp_cuda_includes:
++      wp.set_module_options({'extra_build_options': wp.ModuleBuildOptions(extra_cuda_include_dirs=_warp_cuda_includes)})
++  except Exception:
++    pass
+   wp.init()
+ except:
+   wp = None
+@@ -345,13 +354,19 @@ if wp is not None:
+       out[h,w] = sum/sum_weight
+ 
+   def bilateral_filter_depth(depth, radius=2, zfar=100, sigmaD=2, sigmaR=100000, device='cuda'):
+-    if isinstance(depth, np.ndarray):
+-      depth_wp = wp.array(depth, dtype=float, device=device)
+-    else:
+-      depth_wp = wp.from_torch(depth)
+-    out_wp = wp.zeros(depth.shape, dtype=float, device=device)
+-    wp.launch(kernel=bilateral_filter_depth_kernel, device=device, dim=[depth.shape[0], depth.shape[1]], inputs=[depth_wp, out_wp, radius, zfar, sigmaD, sigmaR])
+-    depth_out = wp.to_torch(out_wp)
++    try:
++      if isinstance(depth, np.ndarray):
++        depth_wp = wp.array(depth, dtype=float, device=device)
++      else:
++        depth_wp = wp.from_torch(depth)
++      out_wp = wp.zeros(depth.shape, dtype=float, device=device)
++      wp.launch(kernel=bilateral_filter_depth_kernel, device=device, dim=[depth.shape[0], depth.shape[1]], inputs=[depth_wp, out_wp, radius, zfar, sigmaD, sigmaR])
++      depth_out = wp.to_torch(out_wp)
++    except Exception:
++      if os.environ.get('FDONPOSE_WARP_FALLBACK', '1') == '0':
++        raise
++      logging.warning('Warp depth bilateral filter unavailable; using an unfiltered CUDA depth tensor')
++      depth_out = torch.as_tensor(depth, dtype=torch.float, device=device)
+ 
+     if isinstance(depth, np.ndarray):
+       depth_out = depth_out.data.cpu().numpy()
+@@ -387,10 +402,16 @@ if wp is not None:
+ 
+ 
+   def erode_depth(depth, radius=2, depth_diff_thres=0.001, ratio_thres=0.8, zfar=100, device='cuda'):
+-    depth_wp = wp.from_torch(torch.as_tensor(depth, dtype=torch.float, device=device))
+-    out_wp = wp.zeros(depth.shape, dtype=float, device=device)
+-    wp.launch(kernel=erode_depth_kernel, device=device, dim=[depth.shape[0], depth.shape[1]], inputs=[depth_wp, out_wp, radius, depth_diff_thres, ratio_thres, zfar],)
+-    depth_out = wp.to_torch(out_wp)
++    try:
++      depth_wp = wp.from_torch(torch.as_tensor(depth, dtype=torch.float, device=device))
++      out_wp = wp.zeros(depth.shape, dtype=float, device=device)
++      wp.launch(kernel=erode_depth_kernel, device=device, dim=[depth.shape[0], depth.shape[1]], inputs=[depth_wp, out_wp, radius, depth_diff_thres, ratio_thres, zfar],)
++      depth_out = wp.to_torch(out_wp)
++    except Exception:
++      if os.environ.get('FDONPOSE_WARP_FALLBACK', '1') == '0':
++        raise
++      logging.warning('Warp depth erosion unavailable; using an un-eroded CUDA depth tensor')
++      depth_out = torch.as_tensor(depth, dtype=torch.float, device=device)
+ 
+     if isinstance(depth, np.ndarray):
+       depth_out = depth_out.data.cpu().numpy()
+@@ -630,6 +651,12 @@ def compute_crop_window_tf_batch(pts=None, H=None, W=None, poses=None, K=None, c
+ 
+ 
+ def cv_draw_text(img,text,uv_top_left,color=(255, 255, 255),fontScale=0.5,thickness=1,fontFace=cv2.FONT_HERSHEY_SIMPLEX,outline_color=None,line_spacing=1.5):
++  # OpenCV 5 asserts img.depth() == CV_8U in putText; scorers' debug canvases are float [0,255].
++  if img.dtype != np.uint8:
++    tmp = img.astype(np.float32)
++    if tmp.size and float(tmp.max()) <= 1.0:
++      tmp = tmp * 255.0
++    img = np.clip(tmp, 0, 255).astype(np.uint8)
+   H,W = img.shape[:2]
+   uv_top_left = np.array(uv_top_left, dtype=float)
+   assert uv_top_left.shape == (2,)
+diff --git a/estimater.py b/estimater.py
+index e147d56..afb2d25 100644
+--- a/estimater.py
++++ b/estimater.py
+@@ -10,6 +10,7 @@
+ from Utils import *
+ from datareader import *
+ import itertools
++import tempfile
+ from learning.training.predict_score import *
+ from learning.training.predict_pose_refine import *
+ import yaml
+@@ -66,7 +67,9 @@ class FoundationPose:
+     self.mesh_path = None
+     self.mesh = mesh
+     if self.mesh is not None:
+-      self.mesh_path = f'/tmp/{uuid.uuid4()}.obj'
++      temp_root = os.environ.get('FDONPOSE_TMP', tempfile.gettempdir())
++      os.makedirs(temp_root, exist_ok=True)
++      self.mesh_path = os.path.join(temp_root, f'{uuid.uuid4()}.obj')
+       self.mesh.export(self.mesh_path)
+     self.mesh_tensors = make_mesh_tensors(self.mesh)
+ 
+diff --git a/mycpp/CMakeLists.txt b/mycpp/CMakeLists.txt
+index 7c8a9a5..218c579 100644
+--- a/mycpp/CMakeLists.txt
++++ b/mycpp/CMakeLists.txt
+@@ -4,7 +4,11 @@ project(mycpp)
+ 
+ set(CMAKE_BUILD_TYPE Release)
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -fopenmp -g3 -O3")
++set(CMAKE_CXX_STANDARD 14)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++if(NOT MSVC)
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O3")
++endif()
+ 
+ 
+ find_package(Boost REQUIRED COMPONENTS system program_options)
+@@ -22,4 +26,8 @@ file(GLOB MY_SRC ${PROJECT_SOURCE_DIR}/src/*.cpp)
+ set(PYBIND11_CPP_STANDARD -std=c++14)
+ 
+ pybind11_add_module(mycpp src/app/pybind_api.cpp ${MY_SRC})
+-target_link_libraries(mycpp PRIVATE ${Boost_LIBRARIES} ${OpenMP_CXX_FLAGS} Eigen3::Eigen)
+\ No newline at end of file
++if(MSVC)
++  target_compile_definitions(mycpp PRIVATE _USE_MATH_DEFINES NOMINMAX)
++  target_compile_options(mycpp PRIVATE /O2)
++endif()
++target_link_libraries(mycpp PRIVATE ${Boost_LIBRARIES} OpenMP::OpenMP_CXX Eigen3::Eigen)
+diff --git a/mycpp/include/Utils.h b/mycpp/include/Utils.h
+index 41703f5..bcaf8ef 100644
+--- a/mycpp/include/Utils.h
++++ b/mycpp/include/Utils.h
+@@ -27,7 +27,9 @@
+ #include <Eigen/Geometry>
+ #include <string>
+ #include <limits.h>
++#ifndef _WIN32
+ #include <unistd.h>
++#endif
+ #include <memory>
+ #include <math.h>
+ #include <boost/format.hpp>
+diff --git a/run_demo.py b/run_demo.py
+index fc542b4..455422d 100644
+--- a/run_demo.py
++++ b/run_demo.py
+@@ -21,6 +21,7 @@ if __name__=='__main__':
+   parser.add_argument('--track_refine_iter', type=int, default=2)
+   parser.add_argument('--debug', type=int, default=1)
+   parser.add_argument('--debug_dir', type=str, default=f'{code_dir}/debug')
++  parser.add_argument('--headless', action='store_true')
+   args = parser.parse_args()
+ 
+   set_logging_format()
+@@ -30,7 +31,9 @@ if __name__=='__main__':
+ 
+   debug = args.debug
+   debug_dir = args.debug_dir
+-  os.system(f'rm -rf {debug_dir}/* && mkdir -p {debug_dir}/track_vis {debug_dir}/ob_in_cam')
++  os.makedirs(debug_dir, exist_ok=False)
++  os.makedirs(os.path.join(debug_dir, 'track_vis'))
++  os.makedirs(os.path.join(debug_dir, 'ob_in_cam'))
+ 
+   to_origin, extents = trimesh.bounds.oriented_bounds(mesh)
+   bbox = np.stack([-extents/2, extents/2], axis=0).reshape(2,3)
+@@ -69,8 +72,9 @@ if __name__=='__main__':
+       center_pose = pose@np.linalg.inv(to_origin)
+       vis = draw_posed_3d_box(reader.K, img=color, ob_in_cam=center_pose, bbox=bbox)
+       vis = draw_xyz_axis(color, ob_in_cam=center_pose, scale=0.1, K=reader.K, thickness=3, transparency=0, is_input_rgb=True)
+-      cv2.imshow('1', vis[...,::-1])
+-      cv2.waitKey(1)
++      if not args.headless:
++        cv2.imshow('1', vis[...,::-1])
++        cv2.waitKey(1)
+ 
+ 
+     if debug>=2:
