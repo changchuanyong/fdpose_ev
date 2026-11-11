@@ -6,7 +6,7 @@ from math import cos, pi, sin
 from pathlib import Path
 import zipfile
 
-from create_tag_mount import CONTENT_TYPES, PACKAGE_RELS, face, marker_grid, write_stl
+from tag_mount_common import CONTENT_TYPES, PACKAGE_RELS, face, marker_grid, write_stl
 
 
 OUT = Path(__file__).resolve().parents[2] / "assets" / "print"
