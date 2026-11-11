@@ -11,7 +11,7 @@ import sys
 import traceback
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def check(component: str, foundationpose_dir: Path) -> dict:

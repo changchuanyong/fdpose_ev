@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# 文本
+*.py   text eol=lf
+*.md   text eol=lf
+*.sh   text eol=lf
+*.txt  text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.patch text eol=lf
+
+# 二进制（不做行尾与 diff 转换）
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.mp4   binary
+*.stl   binary
+*.ply   binary
+*.3mf   binary

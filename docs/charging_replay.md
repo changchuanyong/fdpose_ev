@@ -1,6 +1,6 @@
 # 充电口离线回放
 
-`scripts/charging_replay.py` 从原 `robot-ev-charging` 图库读取已绑定的 RGB、原始 Z16 深度和标定文件。
+`scripts/pipeline/charging_replay.py` 从原 `robot-ev-charging` 图库读取已绑定的 RGB、原始 Z16 深度和标定文件。
 它会校验 RGB／深度文件哈希，使用深度相机内参和深度到彩色外参把深度投影到彩色分辨率，
 调用当前 YOLO 权重生成目标框，再把显式掩膜交给 FoundationPose。
 
@@ -10,10 +10,10 @@
 
 ```powershell
 $record = Get-ChildItem ..\robot-ev-charging\dataset\vision\records\*.json | Select-Object -First 1 -ExpandProperty FullName
-.\scripts\with_build_env.cmd python scripts\charging_replay.py `
+python scripts/pipeline/charging_replay.py `
   --record "$record" `
   --weights "..\robot-ev-charging\runs\detect_split_20261104T141428Z_0ba4dbaf\weights\best.pt" `
-  --mesh assets\插座改.STL `
+  --mesh assets\mesh\socket_mod.STL `
   --mask-mode rectangle `
   --output artifacts\charging-replay.jsonl
 ```
@@ -26,10 +26,10 @@ SAM2 首帧命令：
 
 ```powershell
 $record = Get-ChildItem ..\robot-ev-charging\dataset\vision\records\*.json | Select-Object -First 1 -ExpandProperty FullName
-.\scripts\with_build_env.cmd python scripts\charging_replay.py `
+python scripts/pipeline/charging_replay.py `
   --record "$record" `
   --weights "..\robot-ev-charging\runs\detect_split_20261104T141428Z_0ba4dbaf\weights\best.pt" `
-  --mesh assets\插座改.STL `
+  --mesh assets\mesh\socket_mod.STL `
   --mask-mode sam2 `
   --output artifacts\charging-replay-sam2.jsonl
 ```

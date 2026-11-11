@@ -1,0 +1,14 @@
+{
+  "units": "mm",
+  "frame": "target",
+  "validated": false,
+  "source_ply_sha256": "463dfad968c8401f364f3952a432aac219728690904fbfc286cf5d6059e7c064",
+  "deployed_ply_sha256": "daa3e5aeb637230ab86f9f95d37da01f691fabd688368b40f701c8f324fd6edc",
+  "description": "Nominal socket target frame for the SolidWorks PLY. PLY vertices map to the STL CAD frame by translation [45, 35, 45] mm. The deployed PLY has an ASCII header comment and preserves the original binary mesh payload.",
+  "cad_to_target": [
+    [1, 0, 0, 0],
+    [0, 0, -1, 0],
+    [0, 1, 0, -17.5],
+    [0, 0, 0, 1]
+  ]
+}

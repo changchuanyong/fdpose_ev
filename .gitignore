@@ -4,3 +4,20 @@ artifacts/
 __pycache__/
 *.py[cod]
 third_party/
+
+# 本地虚拟环境与工具缓存
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# 运行时资源（体积大，不随仓库分发）
+weights/
+*.mp4
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+desktop.ini
+

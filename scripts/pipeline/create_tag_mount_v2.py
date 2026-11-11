@@ -9,7 +9,7 @@ import zipfile
 from create_tag_mount import CONTENT_TYPES, PACKAGE_RELS, face, marker_grid, write_stl
 
 
-OUT = Path(__file__).resolve().parents[1] / "assets" / "tag_mount_v2"
+OUT = Path(__file__).resolve().parents[2] / "assets" / "print"
 HOLES = ((36.0, -36.0), (36.0, 36.0))
 HOLE_RADIUS = 3.5
 TAG_X, TAG_Y = 80.0, 0.0

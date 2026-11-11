@@ -19,8 +19,8 @@ import struct
 import zipfile
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "assets"
+ROOT = Path(__file__).resolve().parents[2]
+ASSETS = ROOT / "assets" / "print"
 
 PLATE_W, PLATE_H, BASE_T = 80.0, 70.0, 3.0
 
@@ -35,7 +35,7 @@ MARKER_SIZE = OPEN_X1 - OPEN_X0
 MODULE = MARKER_SIZE / 8.0
 PIXEL_Z0 = 3.6
 
-# M6 clearance holes, measured from 插座改.STL: the socket flange has four
+# M6 clearance holes, measured from socket_mod.STL: the socket flange has four
 # 6.89 mm through-holes at mesh (8.94/80.94, 8.95/80.95), flange face y = 35.
 BOLT_D = 6.6
 BOLT_LOCAL = ((-9.06, 8.95), (-9.06, 80.95))
@@ -303,7 +303,7 @@ def build_spec() -> dict:
         "schema_version": 2,
         "units": "mm",
         "assembly": {
-            "socket_mesh": str(ASSETS / "插座改.STL"),
+            "socket_mesh": str(ROOT / "assets" / "mesh" / "socket_mod.STL"),
             "interface": "plate rear face on the socket flange front plane (target z = 0)",
             "fastening": "2 x M6 x 16 through the 6.89 mm socket flange holes, washer and nut behind the flange",
             "target_hole_centers": [[36.0, -36.0], [36.0, 36.0]],

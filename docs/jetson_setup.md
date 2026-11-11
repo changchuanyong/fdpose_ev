@@ -2,7 +2,8 @@
 
 在远程 Jetson 上从零部署 FoundationPose（固定提交
 `a1b694b83e633c2cb6115b9063d940a687759392`），并跑通官方 model-based demo。
-本文件只描述 Jetson 侧，Windows 侧见 `docs/windows_setup.md`。
+本文件只描述 Jetson 侧。原 Windows 原生环境已于 2026-11-11 清理，版本留档在
+`docs/env/conda-list-windows-20261111.txt` 与 `docs/env/pip-freeze-windows-20261111.txt`。
 
 ## 环境事实
 
@@ -35,8 +36,8 @@ Windows 侧上传补丁、版本约束与脚本：
 
 ```powershell
 scp patches\foundationpose-windows.patch config\runtime-jetson.txt `
-    scripts\jetson_setup.sh scripts\jetson_fetch_wheels.sh scripts\jetson_pose_parity.py `
-    scripts\check_extension.py scripts\check_torch_gpu.py `
+    scripts\setup\jetson_setup.sh scripts\setup\jetson_fetch_wheels.sh scripts\eval\jetson_pose_parity.py `
+    scripts\probes\check_extension.py scripts\probes\check_torch_gpu.py `
     jetson_dianjinglab:~/foundationpose-deploy/staging/
 ```
 
@@ -85,7 +86,7 @@ scp -r third_party\FoundationPose\weights third_party\FoundationPose\demo_data `
 
 ## 平台问题与处理
 
-部署中遇到五处平台问题，均已在 `scripts/jetson_setup.sh` 中固化：
+部署中遇到五处平台问题，均已在 `scripts/setup/jetson_setup.sh` 中固化：
 
 1. **Jetson 轮子源直连极慢，且不支持 HTTP Range。**
    `pypi.jetson-ai-lab.io` 直连单连接实测 20–75 KB/s，而且响应始终是

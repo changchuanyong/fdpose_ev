@@ -14,4 +14,4 @@
 - `socket_tag_m6_v2.stl` 是单色平面板。可把上一级目录的 `tag_aruco_6x6_250_id0.png` 贴在主板矩形区中心，码的**黑色外框边长为 46 mm**，外围留白，图案上沿朝插座上方。定位以图纸为准，贴好后实测边长和码面位置。
 - `socket_tag_m6_assembly.svg` 是装配尺寸图。`socket_tag_m6_spec.json` 的变换是双色板的 CAD 名义值。插座最前端是 `target z=0`，安装面是 `z=-12.5 mm`，双色码面中心名义坐标为 `(80, 0, -7.5) mm`。码坐标原点取黑框中心，+X 朝右、+Y 朝上、+Z 朝相机侧。标定记录应使用实测变换。
 
-再生成模型可在工程根目录运行 `python -B scripts/create_tag_mount_v2.py`。
+再生成模型可在工程根目录运行 `python -B scripts/pipeline/create_tag_mount_v2.py`。

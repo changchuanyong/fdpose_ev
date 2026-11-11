@@ -1,11 +1,29 @@
 # fdonpose
 
-Windows 原生 FoundationPose 充电口视觉工程，目标相机为 D435，兼容 D415。
+FoundationPose 充电口视觉工程，主平台为 Jetson AGX Orin，目标相机为 D435，兼容 D415。
 
-**当前状态：Windows 原生 FoundationPose、SAM2、官方样例和充电口首帧回放已通过。**
+**当前状态：Jetson 原生 FoundationPose、SAM2、官方样例和充电口首帧回放已通过。**
 真实相机验收和绝对位姿精度仍未完成。
 
+## 目录
+
+```text
+apps/        实时窗口应用入口（Jetson + D415）
+scripts/     setup/ 部署 · pipeline/ 业务链路 · eval/ 评估 · probes/ 环境与扩展探针
+config/      运行时版本约束、上游固定版本、geometry/ 几何定义
+docs/        部署与流程文档；历史版本清单归档在 docs/env/
+assets/      mesh/ 网格模型 · print/ 打印件
+patches/     上游适配补丁（见 patches/README.md）
+tests/       冒烟测试（仅依赖标准库）
+artifacts/   运行产物（gitignore，不随仓库分发）
+third_party/ 上游源码（gitignore，按 config/upstream.json 固定版本拉取）
+```
+
 ## 已完成
+
+> 2026-11-05 起的 Windows 原生环境记录为历史存档：该环境已于 2026-11-11 清理，
+> 版本清单留档在 `docs/env/conda-list-windows-20261111.txt` 与
+> `docs/env/pip-freeze-windows-20261111.txt`。
 
 - FoundationPose 官方源码下载到 `third_party/FoundationPose`，固定提交
   `a1b694b83e633c2cb6115b9063d940a687759392`。Windows 适配保存在
@@ -25,7 +43,7 @@ Windows 原生 FoundationPose 充电口视觉工程，目标相机为 D435，兼
 - 远程 Jetson AGX Orin（JetPack 6.2 / CUDA 12.6 / aarch64）完成同一套部署，官方
   mustard0 demo 737 帧跑通（142 s，约 0.19 s/帧），扩展检查和环境自检全部通过；
   过程与平台问题见 `docs/jetson_setup.md`，证据在 `artifacts/jetson/`。
-- `scripts/charging_replay.py` 已接入原工程 RGB、Z16 深度、相机内参、深度到彩色外参、
+- `scripts/pipeline/charging_replay.py` 已接入原工程 RGB、Z16 深度、相机内参、深度到彩色外参、
   YOLO 检测、SAM2 框提示分割和 FoundationPose 初始化；SAM2 首帧输出见
   `artifacts/charging-replay-sam2-20261106-r4.jsonl`。
 
@@ -68,26 +86,43 @@ CUDA 安装曾触发 Conda 的 GBK 解码错误并留下残缺元数据；失败
 | Jetson 重复性 | 两次运行平移完全一致，旋转最大 0.051° |
 | 可视化 | `--debug 2` 出 737 张 3D 框/坐标轴叠加图，ffmpeg 编码为 737 帧、30 fps 的 mp4 |
 
-复现入口：`scripts/jetson_fetch_wheels.sh`、`scripts/jetson_setup.sh`、
+复现入口：`scripts/setup/jetson_fetch_wheels.sh`、`scripts/setup/jetson_setup.sh`、
 `config/runtime-jetson.txt`；步骤、版本理由和五个平台问题见
 `docs/jetson_setup.md`，证据在 `artifacts/jetson/`。
 
-演示材料（Jetson 上直接产出）：[demo-jetson-visual.mp4](artifacts/jetson/demo-jetson-visual.mp4)
-（640×480、30 fps、737 帧）和关键帧
-[demo-jetson-frame-000000.png](artifacts/jetson/demo-jetson-frame-000000.png)、
-[demo-jetson-frame-000480.png](artifacts/jetson/demo-jetson-frame-000480.png)、
-[demo-jetson-frame-000736.png](artifacts/jetson/demo-jetson-frame-000736.png)。
+演示材料（Jetson 上直接产出，体积较大，未随仓库分发）：
+`artifacts/jetson/demo-jetson-visual.mp4`（640×480、30 fps、737 帧）和关键帧
+`artifacts/jetson/demo-jetson-frame-000000.png`、
+`artifacts/jetson/demo-jetson-frame-000480.png`、
+`artifacts/jetson/demo-jetson-frame-000736.png`。
 
-```powershell
-# 无依赖自检；缺少前置条件时返回非零退出码
-.\check_environment.cmd
+### Jetson + D415 实时位姿窗口
 
-# 保存一份新报告（不覆盖已有报告）
-.\check_environment.cmd --output artifacts/environment/my-check.json
+接好 D415 和显示器后，在 **Jetson 桌面终端**从 `~/fdonpose` 启动。`~/FoundationPose` 是单独部署的官方源码和位姿模型目录，由 `--foundationpose` 指定。这里的序列号是当前这台 D415 在 RealSense SDK 中的编号。
 
-# 使用固定的 VS 2022／CUDA 工具链执行构建命令（环境变量仅作用于子进程）
-.\scripts\with_build_env.cmd cmake --version
+```bash
+cd ~/fdonpose
+
+~/venvs/ev-charging-d415-gpu/bin/python -u -B apps/jetson_foundationpose_d415.py \
+  --foundationpose "$HOME/FoundationPose" \
+  --serial 349222063070 \
+  --mesh assets/mesh/socket_mod.PLY \
+  --geometry config/geometry/socket_openings_ply.json \
+  --weights weights/best.pt \
+  --sam2-checkpoint weights/sam2.1_hiera_small.pt \
+  --output "artifacts/d415-live-$(date +%Y%m%d-%H%M%S)" \
+  --show --frames 0
 ```
+
+Jetson 上的 YOLO 权重是 `~/fdonpose/weights/best.pt`。如果出现 `FileNotFoundError`，且报错路径包含 `~/ev-charging-d415/`，请重新复制上面整段命令，从 `cd ~/fdonpose` 开始运行。
+
+窗口出现 `Aim at the socket` 后，把充电口正面移到画面中央，让九孔和四个安装角完整入镜。若显示 `Socket clipped`，请把充电口移离画面边缘。D415 彩色和深度流配置为 1280×720、30 fps，程序将深度对齐到彩色画面。
+YOLO 给 SAM2.1 提供检测框，FoundationPose 用分割轮廓初始化。窗口叠加绿色 3D 框和 XYZ 坐标轴，跟踪首帧及之后约每 0.6 秒核对一次 3D 框投影与检测框，明显偏离时重新寻找目标。
+输出目录里的 `initial_mask.jpg` 和 `first_pose.jpg` 用于核对首帧分割和位姿，`summary.json` 记录实际跟踪帧率和重置次数。
+`--frames 0` 持续运行，按 **Q** 或 **Esc** 退出。`~/fdonpose/artifacts/d415-live-*` 里的 `poses.jsonl` 逐帧保存相机坐标系下的位姿，平移单位为米。
+`socket_mod.PLY` 使用与它配套的 `config/geometry/socket_openings_ply.json` 将网格原点转换到充电口目标坐标系。
+
+已在 Jetson 的 X11 桌面用实物充电口验证 1280×720 预览、SAM2 初始化和持续跟踪。静止场景的首尾叠加图均贴合充电口。绝对 6D 位姿精度仍待独立测量。
 
 ## 下一步
 
@@ -95,10 +130,10 @@ CUDA 安装曾触发 Conda 的 GBK 解码错误并留下残缺元数据；失败
 
 ```powershell
 $record = Get-ChildItem ..\robot-ev-charging\dataset\vision\records\*.json | Select-Object -First 1 -ExpandProperty FullName
-.\scripts\with_build_env.cmd python scripts\charging_replay.py `
+python scripts/pipeline/charging_replay.py `
   --record "$record" `
   --weights "..\robot-ev-charging\runs\detect_split_20261104T141428Z_0ba4dbaf\weights\best.pt" `
-  --mesh assets\插座改.STL `
+  --mesh assets\mesh\socket_mod.STL `
   --mask-mode rectangle `
   --output artifacts\charging-replay.jsonl
 ```
@@ -112,8 +147,8 @@ SAM2 安装时关闭了可选 CUDA 后处理扩展，主分割推理仍使用 RT
 原 `robot-ev-charging` 仅作为数据、模型和几何定义的只读来源；本工程只复制了 CAD STL。
 项目不驱动机械臂，不包含物理插装验收结论。
 
-`environment.windows.yml` 和 `config/runtime-constraints.txt` 仍是候选配置，不是完整发布锁。
-Warp 深度滤波在当前 Windows/Conda 组合中无法通过 NVRTC 找到 `builtin.h`，
+`config/runtime-constraints.txt` 仍是候选配置，不是完整发布锁。
+Warp 深度滤波在原 Windows/Conda 组合中无法通过 NVRTC 找到 `builtin.h`，
 FoundationPose 回放记录了明确的未滤波 CUDA 深度回退；Warp 独立 prefix-sum 检查仍通过。
 上游许可证保留在 `third_party/FoundationPose/LICENSE`。
 

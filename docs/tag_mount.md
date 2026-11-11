@@ -2,16 +2,16 @@
 
 生成文件：
 
-- `assets/tag_mount_black_white_H2C.3mf`：双色打印版，白板 + 黑白码块，两个 part 已分到 1/2 号挤出机；
-- `assets/tag_mount_plate.stl`：单色版，凹框留给纸标（码面 z=3）；
-- `assets/tag_aruco_6x6_250_id0.png`：ArUco 6×6_250，ID 0；
-- `assets/tag_mount_spec.json`：尺寸、孔位、基准和名义坐标；
-- `assets/tag_mount_layout.svg`：布局图。
+- `assets/print/tag_mount_black_white_H2C.3mf`：双色打印版，白板 + 黑白码块，两个 part 已分到 1/2 号挤出机；
+- `assets/print/tag_mount_plate.stl`：单色版，凹框留给纸标（码面 z=3）；
+- `assets/print/tag_aruco_6x6_250_id0.png`：ArUco 6×6_250，ID 0；
+- `assets/print/tag_mount_spec.json`：尺寸、孔位、基准和名义坐标；
+- `assets/print/tag_mount_layout.svg`：布局图。
 
 重新生成：
 
 ```powershell
-.\scripts\with_build_env.cmd python scripts\create_tag_mount.py
+python scripts/pipeline/create_tag_mount.py
 ```
 
 ## 打印（双色）

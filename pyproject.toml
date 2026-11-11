@@ -1,0 +1,13 @@
+# 仅用于工具配置。本项目不作为可安装分发包，运行入口是 apps/ 与 scripts/ 下的脚本。
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["third_party", "artifacts", ".cache", ".runtime"]
+
+# 只查语法级错误（未定义名、语法、无效比较），风格问题不进 CI。
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

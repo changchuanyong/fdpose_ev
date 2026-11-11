@@ -20,7 +20,7 @@ import cv2
 import numpy as np
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SOURCE = ROOT.parent / "robot-ev-charging"
 
 
@@ -243,7 +243,7 @@ def main() -> int:
     parser.add_argument("--source-root", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--record", type=Path)
     parser.add_argument("--max-frames", type=int, default=1)
-    parser.add_argument("--mesh", type=Path, default=ROOT / "assets/插座改.STL")
+    parser.add_argument("--mesh", type=Path, default=ROOT / "assets/mesh/socket_mod.STL")
     parser.add_argument("--weights", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--mask-mode", choices=["rectangle", "sam2"], default="rectangle")
