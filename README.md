@@ -98,13 +98,12 @@ CUDA 安装曾触发 Conda 的 GBK 解码错误并留下残缺元数据；失败
 
 ### Jetson + D415 实时位姿窗口
 
-接好 D415 和显示器后，在 **Jetson 桌面终端**从 `~/fdonpose` 启动。`~/FoundationPose` 是单独部署的官方源码和位姿模型目录，由 `--foundationpose` 指定。这里的序列号是当前这台 D415 在 RealSense SDK 中的编号。
+接好 D415 和显示器后，在 **Jetson 桌面终端**从 `~/fdonpose` 启动。程序默认使用项目自身的 `third_party/FoundationPose` 源码和其中的位姿模型，不再依赖单独的 `~/FoundationPose`。这里的序列号是当前这台 D415 在 RealSense SDK 中的编号。
 
 ```bash
 cd ~/fdonpose
 
 ~/venvs/ev-charging-d415-gpu/bin/python -u -B apps/jetson_foundationpose_d415.py \
-  --foundationpose "$HOME/FoundationPose" \
   --serial 349222063070 \
   --mesh assets/mesh/socket_mod.PLY \
   --geometry config/geometry/socket_openings_ply.json \
@@ -116,7 +115,7 @@ cd ~/fdonpose
 
 Jetson 上的 YOLO 权重是 `~/fdonpose/weights/best.pt`。如果出现 `FileNotFoundError`，且报错路径包含 `~/ev-charging-d415/`，请重新复制上面整段命令，从 `cd ~/fdonpose` 开始运行。
 
-窗口出现 `Aim at the socket` 后，把充电口正面移到画面中央，让九孔和四个安装角完整入镜。若显示 `Socket clipped`，请把充电口移离画面边缘。D415 彩色和深度流配置为 1280×720、30 fps，程序将深度对齐到彩色画面。
+窗口出现 `Aim at the socket` 后，把充电口正面移到画面中央，让九孔和四个安装角完整入镜。若显示 `Socket clipped`，请把充电口移离画面边缘。D415 彩色和深度流默认配置为与官方样例一致的 640×480、30 fps，以减少 Jetson 上的深度处理和跟踪耗时；程序将深度对齐到彩色画面。需要 720p 时追加 `--stream-width 1280 --stream-height 720`。
 YOLO 给 SAM2.1 提供检测框，FoundationPose 用分割轮廓初始化。窗口叠加绿色 3D 框和 XYZ 坐标轴，跟踪首帧及之后约每 0.6 秒核对一次 3D 框投影与检测框，明显偏离时重新寻找目标。
 输出目录里的 `initial_mask.jpg` 和 `first_pose.jpg` 用于核对首帧分割和位姿，`summary.json` 记录实际跟踪帧率和重置次数。
 `--frames 0` 持续运行，按 **Q** 或 **Esc** 退出。`~/fdonpose/artifacts/d415-live-*` 里的 `poses.jsonl` 逐帧保存相机坐标系下的位姿，平移单位为米。
@@ -147,7 +146,7 @@ SAM2 安装时关闭了可选 CUDA 后处理扩展，主分割推理仍使用 RT
 原 `robot-ev-charging` 仅作为数据、模型和几何定义的只读来源；本工程只复制了 CAD STL。
 项目不驱动机械臂，不包含物理插装验收结论。
 
-`config/runtime-constraints.txt` 仍是候选配置，不是完整发布锁。
+`config/runtime-jetson.txt` 仍是候选配置，不是完整发布锁。
 Warp 深度滤波在原 Windows/Conda 组合中无法通过 NVRTC 找到 `builtin.h`，
 FoundationPose 回放记录了明确的未滤波 CUDA 深度回退；Warp 独立 prefix-sum 检查仍通过。
 上游许可证保留在 `third_party/FoundationPose/LICENSE`。

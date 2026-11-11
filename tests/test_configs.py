@@ -46,6 +46,20 @@ class ConfigTest(unittest.TestCase):
         ]
         self.assertEqual([], bad, "无法解析的依赖行")
 
+    def test_no_duplicate_requirements(self) -> None:
+        """同一个包只写一行；重复出现通常意味着两条约束互相矛盾。
+
+        例：同时写 ``opencv-python-headless==5.0.0.93`` 和 ``opencv-python-headless<5``，
+        pip 取交集为空，``pip install -r`` 会直接解析失败。
+        """
+        path = ROOT / "config" / "runtime-jetson.txt"
+        seen: dict[str, list[int]] = {}
+        for number, line in requirement_lines(path):
+            name = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", line).group(0).lower()
+            seen.setdefault(name, []).append(number)
+        duplicates = {name: lines for name, lines in seen.items() if len(lines) > 1}
+        self.assertEqual({}, duplicates, f"重复的依赖行（包名 -> 行号）：{duplicates}")
+
     def test_upstream_pin_has_commit(self) -> None:
         data = json.loads((ROOT / "config" / "upstream.json").read_text(encoding="utf-8"))
         text = json.dumps(data)
