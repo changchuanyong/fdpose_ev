@@ -14,7 +14,7 @@
 #   $WORK/config/runtime-jetson.txt
 set -euo pipefail
 
-REPO="${REPO:-$HOME/FoundationPose}"
+REPO="${REPO:-$HOME/fdonpose/third_party/FoundationPose}"
 VENV="${VENV:-$HOME/venvs/foundationpose}"
 WORK="${WORK:-$HOME/foundationpose-deploy}"
 PATCH="${PATCH:-$WORK/foundationpose-windows.patch}"

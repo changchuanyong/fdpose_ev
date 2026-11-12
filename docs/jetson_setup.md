@@ -25,7 +25,7 @@ Windows 侧局域网传输已有资产（来源与哈希见 `artifacts/environme
 
 远端全部位于 `dianjinglab` 用户家目录，未修改任何系统组件：
 
-- `~/FoundationPose`：官方仓库，固定提交 + `patches/foundationpose-windows.patch`。
+- `~/fdonpose/third_party/FoundationPose`：项目自身的官方源码副本，固定提交 + `patches/foundationpose-windows.patch`。
 - `~/venvs/foundationpose`：Python 3.10 虚拟环境。
 - `~/foundationpose-deploy/{logs,config,scripts}`：部署脚本、版本约束与日志。
 - `~/fp-debug-jetson`：demo 输出（`ob_in_cam`、`track_vis`）。
@@ -63,7 +63,7 @@ bash ~/foundationpose-deploy/scripts/jetson_setup.sh mycpp
 
 ```powershell
 scp -r third_party\FoundationPose\weights third_party\FoundationPose\demo_data `
-    jetson_dianjinglab:~/FoundationPose/
+    jetson_dianjinglab:~/fdonpose/third_party/FoundationPose/
 ```
 
 实测 PowerShell 的 `tar -cf - | ssh "tar -xf -"` 管道会破坏二进制流（远端 tar 报
@@ -124,12 +124,12 @@ pybind11 构建，不需要 conda 的 `eigen`/`boost-cpp` 包。
 ```bash
 PY=~/venvs/foundationpose/bin/python
 E=~/foundationpose-deploy/evidence
-cd ~/FoundationPose
+cd ~/fdonpose/third_party/FoundationPose
 $PY check_env.py --demo-data
 $PY ~/foundationpose-deploy/scripts/check_torch_gpu.py --expect-torch 2.9.1 \
     --expect-torchvision 0.24.1 --output "$E/torch-gpu.json"
 $PY ~/foundationpose-deploy/scripts/check_extension.py pytorch3d \
-    --foundationpose-dir ~/FoundationPose --output "$E/pytorch3d.json"
+    --foundationpose-dir ~/fdonpose/third_party/FoundationPose --output "$E/pytorch3d.json"
 # nvdiffrast / warp / mycpp 同理
 $PY run_demo.py --headless --debug 1 --debug_dir ~/fp-debug-jetson
 # 出可视化图（3D 框 + 坐标轴），再编码视频：

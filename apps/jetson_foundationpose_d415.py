@@ -16,10 +16,15 @@ import pyrealsense2 as rs
 import torch
 import trimesh
 
+from pose_checks import (MAX_REVIEW_ROTATION_DEG, MAX_REVIEW_TRANSLATION_M,
+                         depth_alignment, pose_delta)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECK_PERIOD_S = 0.6
 MIN_BOX_IOU = 0.35
+RECOVERY_WINDOW_S = 3.0
+REGISTRATION_RETRY_S = 5.0
 
 
 def detect_socket(detector, bgr):
@@ -89,7 +94,7 @@ class PreviewWindow:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--foundationpose", type=Path, default=Path.home() / "FoundationPose")
+    parser.add_argument("--foundationpose", type=Path, default=ROOT / "third_party/FoundationPose")
     parser.add_argument("--mesh", type=Path, required=True)
     parser.add_argument("--geometry", type=Path, required=True)
     parser.add_argument("--weights", type=Path, required=True)
@@ -97,10 +102,22 @@ def main():
     parser.add_argument("--serial", required=True, help="RealSense SDK serial")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--frames", type=int, default=60, help="Tracking frames after initialization, 0 for continuous")
+    parser.add_argument("--stream-width", type=int, default=640)
+    parser.add_argument("--stream-height", type=int, default=480)
+    parser.add_argument("--init-width", type=int, default=640,
+                        help="Downscale SAM2 and registration to this width")
+    parser.add_argument("--est-refine-iter", type=int, default=3,
+                        help="Register refinement iterations; official default 5, 3 measured within 0.12 mm / 0.28 deg on the socket")
     parser.add_argument("--show", action="store_true", help="Show live RGB and pose overlays on the Jetson desktop")
     args = parser.parse_args()
     if args.frames < 0:
         parser.error("--frames must be nonnegative")
+    if args.stream_width <= 0 or args.stream_height <= 0 or args.init_width <= 0:
+        parser.error("--stream-width, --stream-height and --init-width must be positive")
+    if args.est_refine_iter < 1:
+        parser.error("--est-refine-iter must be positive")
+    if not (args.foundationpose / "estimater.py").is_file():
+        parser.error(f"Project FoundationPose source not found: {args.foundationpose}")
     if args.show and not os.environ.get("DISPLAY"):
         parser.error("--show needs a desktop display. Run from a terminal on the Jetson desktop.")
     if not args.sam2_checkpoint.is_file():
@@ -110,7 +127,7 @@ def main():
     os.environ.setdefault("FDONPOSE_TMP", str(args.output / "tmp"))
     sys.path.insert(0, str(args.foundationpose.resolve()))
     sys.path.insert(0, str(ROOT / "third_party/sam2"))
-    from estimater import FoundationPose, draw_posed_3d_box, draw_xyz_axis, set_seed
+    from estimater import FoundationPose, draw_posed_3d_box, draw_xyz_axis, nvdiffrast_render, set_seed
     from sam2.build_sam import build_sam2
     from sam2.sam2_image_predictor import SAM2ImagePredictor
     from ultralytics import YOLO
@@ -135,8 +152,8 @@ def main():
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_device(args.serial)
-    config.enable_stream(rs.stream.color, 1280, 720, rs.format.rgb8, 30)
-    config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
+    config.enable_stream(rs.stream.color, args.stream_width, args.stream_height, rs.format.rgb8, 30)
+    config.enable_stream(rs.stream.depth, args.stream_width, args.stream_height, rs.format.z16, 30)
     profile = pipeline.start(config)
     preview = None
     try:
@@ -194,7 +211,46 @@ def main():
                 crop[:] = draw_xyz_axis(crop, target_pose, scale=scale, K=local_K)
             return boxed
 
-        def write_pose(stream, pose, frame, device_ms, stage, elapsed_ms, alignment_iou=None):
+        def validate_pose(pose, detection_box, measured_depth, evaluation_K=None):
+            evaluation_K = K if evaluation_K is None else evaluation_K
+            iou = box_iou(projected_box(evaluation_K, corners, pose), detection_box)
+            result = {"accepted": False, "alignment_iou": iou}
+            if detection_box is None or iou < MIN_BOX_IOU:
+                return result
+            with torch.inference_mode():
+                _, rendered_depth, _ = nvdiffrast_render(
+                    K=evaluation_K, H=measured_depth.shape[0], W=measured_depth.shape[1],
+                    ob_in_cams=estimator.pose_last.reshape(1, 4, 4), glctx=estimator.glctx,
+                    mesh_tensors=estimator.mesh_tensors, output_size=measured_depth.shape,
+                )
+            rendered = rendered_depth[0].detach().cpu().numpy()
+            result.update(depth_alignment(rendered, measured_depth))
+            return result
+
+        def save_drift(before, after, rejected_pose, recovery_pose, rejected_validation,
+                       recovery_validation, change):
+            directory = args.output / "drift" / f"{after[2]:06d}"
+            directory.mkdir(parents=True, exist_ok=False)
+            for name, frame in (("before", before), ("after", after)):
+                rgb, depth, number, timestamp, pose = frame
+                cv2.imwrite(str(directory / f"{name}_rgb.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+                np.save(directory / f"{name}_depth.npy", depth, allow_pickle=False)
+                cv2.imwrite(str(directory / f"{name}_depth_mm.png"),
+                            np.rint(depth * 1000).astype(np.uint16))
+                np.savetxt(directory / f"{name}_pose.txt", pose)
+            np.savetxt(directory / "cam_K.txt", K)
+            np.savetxt(directory / "rejected_pose.txt", rejected_pose)
+            np.savetxt(directory / "recovery_pose.txt", recovery_pose)
+            metadata = {"before_frame": before[2], "after_frame": after[2],
+                        "before_device_time_ms": before[3], "after_device_time_ms": after[3],
+                        "change_from_confirmed": {"translation_m": change[0], "rotation_deg": change[1]},
+                        "rejected_validation": rejected_validation,
+                        "recovery_validation": recovery_validation}
+            (directory / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n",
+                                                       encoding="utf-8")
+            print(json.dumps({"event": "drift_rgbd_saved", "path": str(directory)}), flush=True)
+
+        def write_pose(stream, pose, frame, device_ms, stage, elapsed_ms, validation=None, change=None):
             target_pose = np.asarray(pose, dtype=float) @ cad_from_target
             rotation = target_pose[:3, :3]
             if (not np.isfinite(target_pose).all() or target_pose[2, 3] <= 0
@@ -202,16 +258,20 @@ def main():
                     or abs(np.linalg.det(rotation) - 1) > 1e-3):
                 raise RuntimeError("FoundationPose returned an invalid rigid transform")
             record = {"frame": frame, "device_time_ms": device_ms, "stage": stage,
-                      "elapsed_ms": elapsed_ms, "alignment_iou": alignment_iou,
-                      "T_camera_target_m": target_pose.tolist()}
+                      "elapsed_ms": elapsed_ms, "validation": validation,
+                      "change_from_confirmed": change, "T_camera_target_m": target_pose.tolist()}
             stream.write(json.dumps(record, allow_nan=False) + "\n")
             stream.flush()
             return target_pose
 
+        registration_not_before = 0.0
+
         def seek_pose():
+            nonlocal registration_not_before
             deadline = float("inf") if preview else time.monotonic() + 25
             status = "Aim at the socket"
             while time.monotonic() < deadline:
+                started = time.perf_counter()
                 rgb, depth, number, timestamp = read_frame()
                 bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                 detection = detect_socket(detector, bgr)
@@ -221,44 +281,82 @@ def main():
                         return None
                     continue
                 box, confidence = detection
+                now = time.monotonic()
+                if last_confirmed_pose_last is not None and now < registration_not_before:
+                    estimator.pose_last = last_confirmed_pose_last.clone()
+                    recovered = estimator.track_one(rgb=rgb, depth=depth, K=K, iteration=4)
+                    torch.cuda.synchronize()
+                    validation = validate_pose(recovered, box, depth)
+                    elapsed = (time.perf_counter() - started) * 1000
+                    if validation["accepted"]:
+                        print(json.dumps({"event": "tracking_recovered", "frame": number,
+                                          "validation": validation,
+                                          "backend": "last_confirmed_pose"}), flush=True)
+                        return (recovered, rgb, depth, bgr, bgr, number, timestamp,
+                                elapsed, validation, "recover")
+                    status = "Recovering from last confirmed pose | No SAM2"
+                    if preview and not preview.present(bgr, status):
+                        return None
+                    continue
+                if now < registration_not_before:
+                    status = "Waiting before registration retry | No SAM2"
+                    if preview and not preview.present(bgr, status):
+                        return None
+                    continue
+                registration_not_before = time.monotonic() + REGISTRATION_RETRY_S
+                init_scale = min(1.0, args.init_width / rgb.shape[1])
+                init_height = round(rgb.shape[0] * init_scale)
+                init_width = round(rgb.shape[1] * init_scale)
+                init_rgb = cv2.resize(rgb, (init_width, init_height), interpolation=cv2.INTER_LINEAR)
+                init_depth = cv2.resize(depth, (init_width, init_height), interpolation=cv2.INTER_NEAREST)
+                init_K = K.copy()
+                init_K[0] *= init_scale
+                init_K[1] *= init_scale
+                init_box = box * init_scale
                 with torch.inference_mode():
-                    segmenter.set_image(rgb)
-                    masks, scores, _ = segmenter.predict(box=box, multimask_output=False)
+                    segmenter.set_image(init_rgb)
+                    masks, scores, _ = segmenter.predict(box=init_box, multimask_output=False)
                     segmenter.reset_predictor()
-                mask = masks[0].astype(bool)
-                ys, xs = np.nonzero(mask)
-                if len(xs) < 128 or np.count_nonzero(depth[mask] > 0) < max(128, len(xs) // 10):
+                init_mask = masks[0].astype(bool)
+                ys, xs = np.nonzero(init_mask)
+                if (len(xs) < 128 or np.count_nonzero(init_depth[init_mask] > 0)
+                        < max(128, len(xs) // 10)):
                     status = "Insufficient aligned depth in SAM2 mask"
                     if preview and not preview.present(bgr, status):
                         return None
                     continue
                 mask_box = np.array([xs.min(), ys.min(), xs.max() + 1, ys.max() + 1])
-                if not box_in_view(mask_box, bgr.shape, margin=1):
+                if not box_in_view(mask_box, init_rgb.shape, margin=1):
                     status = "SAM2 mask clipped | Move socket fully into view"
                     if preview and not preview.present(bgr, status):
                         return None
                     continue
                 overlay = bgr.copy()
-                overlay[mask] = (overlay[mask] * 0.55 + np.array([0, 255, 0]) * 0.45).astype(np.uint8)
+                overlay_mask = cv2.resize(init_mask.astype(np.uint8), (rgb.shape[1], rgb.shape[0]),
+                                          interpolation=cv2.INTER_NEAREST).astype(bool)
+                overlay[overlay_mask] = (overlay[overlay_mask] * 0.55
+                                         + np.array([0, 255, 0]) * 0.45).astype(np.uint8)
                 x0, y0, x1, y1 = np.rint(box).astype(int)
                 cv2.rectangle(overlay, (x0, y0), (x1, y1), (0, 200, 255), 2)
                 cv2.imwrite(str(args.output / "candidate_mask.jpg"), overlay)
                 if preview and not preview.present(overlay, "SAM2 mask | Initializing FoundationPose"):
                     return None
                 started = time.perf_counter()
-                initial = estimator.register(K=K, rgb=rgb, depth=depth, ob_mask=mask, iteration=5)
+                initial = estimator.register(K=init_K, rgb=init_rgb, depth=init_depth,
+                                             ob_mask=init_mask, iteration=args.est_refine_iter)
                 torch.cuda.synchronize()
                 elapsed = (time.perf_counter() - started) * 1000
-                iou = box_iou(projected_box(K, corners, initial), mask_box)
-                if estimator.pose_last is None or iou < MIN_BOX_IOU:
+                validation = validate_pose(initial, mask_box, init_depth, evaluation_K=init_K)
+                if estimator.pose_last is None or not validation["accepted"]:
                     estimator.pose_last = None
-                    status = "FoundationPose projection did not match the SAM2 mask"
-                    print(json.dumps({"event": "registration_rejected", "alignment_iou": iou}), flush=True)
+                    status = "FoundationPose pose failed projection/depth validation"
+                    print(json.dumps({"event": "registration_rejected", "validation": validation}), flush=True)
                     continue
                 print(json.dumps({"event": "registration_accepted", "frame": number,
                                   "detector_confidence": confidence, "sam2_score": float(scores[0]),
-                                  "alignment_iou": iou, "register_ms": elapsed}), flush=True)
-                return initial, bgr, overlay, number, timestamp, elapsed, iou
+                                  "validation": validation, "register_ms": elapsed}), flush=True)
+                return (initial, rgb, depth, bgr, overlay, number, timestamp,
+                        elapsed, validation, "register")
             cv2.imwrite(str(args.output / "camera.jpg"), bgr)
             print(f"No aligned charging socket pose before timeout: {status}", flush=True)
             return None
@@ -266,21 +364,30 @@ def main():
         for _ in range(12):
             read_frame()
         times, translations = deque(maxlen=600), deque(maxlen=600)
-        tracked_poses = registrations = checks = resets = 0
+        tracked_poses = registrations = checks = recoveries = resets = 0
         duration = 0.0
         init_ms = image = last_overlay = None
+        last_confirmed_pose = last_confirmed_pose_last = last_confirmed_frame = None
         with (args.output / "poses.jsonl").open("x", encoding="utf-8") as stream:
             try:
                 while not args.frames or tracked_poses < args.frames:
                     registration = seek_pose()
                     if registration is None:
                         break
-                    pose, bgr, mask_overlay, number, timestamp, elapsed, iou = registration
-                    target_pose = write_pose(stream, pose, number, timestamp, "register", elapsed, iou)
-                    registrations += 1
+                    (pose, rgb, depth, bgr, mask_overlay, number, timestamp,
+                     elapsed, validation, stage) = registration
+                    target_pose = write_pose(stream, pose, number, timestamp, stage, elapsed,
+                                             validation=validation)
+                    if stage == "register":
+                        registrations += 1
+                    else:
+                        recoveries += 1
+                    last_confirmed_pose = pose.copy()
+                    last_confirmed_pose_last = estimator.pose_last.clone()
+                    last_confirmed_frame = rgb, depth, number, timestamp, pose.copy()
                     last_overlay = bgr, pose, target_pose
                     image = draw_pose(bgr.copy(), pose, target_pose)
-                    if registrations == 1:
+                    if registrations == 1 and stage == "register":
                         init_ms = elapsed
                         cv2.imwrite(str(args.output / "initial_mask.jpg"), mask_overlay)
                         cv2.imwrite(str(args.output / "first_pose.jpg"), image)
@@ -293,29 +400,63 @@ def main():
                         if new_number <= number:
                             raise RuntimeError("Camera frame number did not advance")
                         number = new_number
+                        stage, validation = "track", None
                         pose = estimator.track_one(rgb=rgb, depth=depth, K=K, iteration=2)
                         torch.cuda.synchronize()
                         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                         projection = projected_box(K, corners, pose)
-                        iou = None
-                        if projection is None or started >= next_check_at:
+                        translation_change, rotation_change = pose_delta(last_confirmed_pose, pose)
+                        change = {"translation_m": translation_change, "rotation_deg": rotation_change}
+                        sudden_change = (translation_change > MAX_REVIEW_TRANSLATION_M
+                                         or rotation_change > MAX_REVIEW_ROTATION_DEG)
+                        if projection is None or sudden_change or started >= next_check_at:
                             detection = detect_socket(detector, bgr)
                             detection_box = detection[0] if detection and box_in_view(detection[0], bgr.shape) else None
-                            iou = box_iou(projection, detection_box)
+                            validation = validate_pose(pose, detection_box, depth)
                             checks += 1
                             next_check_at = started + CHECK_PERIOD_S
-                            if iou < MIN_BOX_IOU:
-                                resets += 1
-                                estimator.pose_last = None
-                                duration += time.perf_counter() - started
-                                print(json.dumps({"event": "tracking_lost", "frame": number,
-                                                  "alignment_iou": iou}), flush=True)
-                                break
+                            if not validation["accepted"]:
+                                rejected_pose = pose.copy()
+                                rejected_validation = validation
+                                estimator.pose_last = last_confirmed_pose_last.clone()
+                                recovered = estimator.track_one(rgb=rgb, depth=depth, K=K, iteration=4)
+                                torch.cuda.synchronize()
+                                recovery_validation = validate_pose(recovered, detection_box, depth)
+                                save_drift(last_confirmed_frame,
+                                           (rgb, depth, number, timestamp, rejected_pose),
+                                           rejected_pose, recovered, rejected_validation,
+                                           recovery_validation, (translation_change, rotation_change))
+                                if recovery_validation["accepted"]:
+                                    pose, validation, stage = recovered, recovery_validation, "recover"
+                                    translation_change, rotation_change = pose_delta(last_confirmed_pose, pose)
+                                    change = {"translation_m": translation_change,
+                                              "rotation_deg": rotation_change}
+                                    recoveries += 1
+                                    print(json.dumps({"event": "tracking_recovered", "frame": number,
+                                                      "validation": validation,
+                                                      "backend": "last_confirmed_pose"}), flush=True)
+                                else:
+                                    resets += 1
+                                    estimator.pose_last = None
+                                    registration_not_before = time.monotonic() + RECOVERY_WINDOW_S
+                                    if preview:
+                                        preview.present(bgr, "Pose rejected | Recovering target")
+                                    duration += time.perf_counter() - started
+                                    print(json.dumps({"event": "tracking_lost", "frame": number,
+                                                      "rejected_validation": rejected_validation,
+                                                      "recovery_validation": recovery_validation,
+                                                      "fallback": "cached_pose_then_throttled_register"}), flush=True)
+                                    break
                         ms = (time.perf_counter() - started) * 1000
-                        target_pose = write_pose(stream, pose, number, timestamp, "track", ms, iou)
+                        target_pose = write_pose(stream, pose, number, timestamp, stage, ms,
+                                                 validation=validation, change=change)
                         times.append(ms)
                         translations.append(target_pose[:3, 3])
                         tracked_poses += 1
+                        if validation is not None and validation["accepted"]:
+                            last_confirmed_pose = pose.copy()
+                            last_confirmed_pose_last = estimator.pose_last.clone()
+                            last_confirmed_frame = rgb, depth, number, timestamp, pose.copy()
                         last_overlay = bgr, pose, target_pose
                         if preview:
                             image = draw_pose(bgr, pose, target_pose)
@@ -333,8 +474,9 @@ def main():
             cv2.imwrite(str(args.output / "last_pose.jpg"), image)
         summary = {"camera_serial": serial, "resolution": [intr.width, intr.height],
                    "requested_stream_fps": 30, "initialization_mask": "SAM2.1_hiera_small",
+                   "est_refine_iter": args.est_refine_iter,
                    "register_ms": init_ms, "registrations": registrations, "tracked_poses": tracked_poses,
-                   "tracking_checks": checks, "tracking_resets": resets,
+                   "tracking_checks": checks, "tracking_recoveries": recoveries, "tracking_resets": resets,
                    "tracking_fps": tracked_poses / duration if tracked_poses else None,
                    "statistics_sample_frames": len(times),
                    "tracking_latency_p50_ms": float(np.median(times)) if times else None,

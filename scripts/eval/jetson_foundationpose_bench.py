@@ -18,7 +18,7 @@ import trimesh
 
 
 PROJECT = Path(__file__).resolve().parents[2]
-FOUNDATIONPOSE = Path.home() / "FoundationPose"
+FOUNDATIONPOSE = PROJECT / "third_party/FoundationPose"
 MESH = PROJECT / "assets/mesh/socket_mod.PLY"
 TRACK_FRAMES = 8
 
